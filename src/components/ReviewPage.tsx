@@ -33,11 +33,17 @@ export function ReviewPage({
   save,
   onEdit,
   readOnly,
+  operation,
+  setOperation,
 }: {
   data: Data;
   save: (data: Data) => void;
   onEdit: (entry: Entry) => void;
   readOnly: boolean;
+  // Held by App so the last review action can still be undone after
+  // visiting another page; undoEntries still declines if entries changed.
+  operation: UndoRecord | null;
+  setOperation: (operation: UndoRecord | null) => void;
 }) {
   const [filters, setFilters] = useState<ReviewFilters>(() => ({
     week: weekStart(
@@ -55,7 +61,6 @@ export function ReviewPage({
   const [selected, setSelected] = useState<string[]>([]);
   const [action, setAction] = useState('review');
   const [targetClient, setTargetClient] = useState(data.clients[0]?.id ?? '');
-  const [operation, setOperation] = useState<UndoRecord | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const visible = selectReview(data.entries, data.clients, filters);
@@ -170,7 +175,7 @@ export function ReviewPage({
           disabled={!visible.length}
           onClick={() => {
             download(
-              csv(exportEntries, data.clients),
+              csv(exportEntries, data.clients, { reviewed: true }),
               `counsel-review-${week}.csv`,
               'text/csv;charset=utf-8',
             );

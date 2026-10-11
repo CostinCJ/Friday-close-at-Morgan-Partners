@@ -142,7 +142,11 @@ export function totals(entries: Entry[]) {
     utilization: total ? Math.round((billable / total) * 100) : 0,
   };
 }
-export function csv(entries: Entry[], clients: Client[]) {
+export function csv(
+  entries: Entry[],
+  clients: Client[],
+  { reviewed = false }: { reviewed?: boolean } = {},
+) {
   const cell = (v: string | number) => {
     let text = String(v);
     if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
@@ -158,6 +162,7 @@ export function csv(entries: Entry[], clients: Client[]) {
         'Description',
         'Duration (minutes)',
         'Billable',
+        ...(reviewed ? ['Reviewed'] : []),
       ],
       ...entries.map((e) => [
         e.date,
@@ -166,6 +171,7 @@ export function csv(entries: Entry[], clients: Client[]) {
         e.description,
         e.minutes,
         e.billable ? 'Yes' : 'No',
+        ...(reviewed ? [e.reviewed ? 'Yes' : 'No'] : []),
       ]),
     ]
       .map((row) => row.map(cell).join(','))

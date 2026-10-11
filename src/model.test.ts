@@ -137,3 +137,20 @@ describe('CSV export', () => {
     );
   });
 });
+describe('CSV review status', () => {
+  it('adds a Reviewed column only when asked', () => {
+    const plain = csv([{ ...entry, reviewed: true }], clients);
+    expect(plain.split('\r\n')[0]).not.toContain('Reviewed');
+    const withReview = csv(
+      [
+        { ...entry, reviewed: true },
+        { ...entry, id: 'f' },
+      ],
+      clients,
+      { reviewed: true },
+    ).split('\r\n');
+    expect(withReview[0]).toMatch(/"Billable","Reviewed"$/);
+    expect(withReview[1]).toMatch(/"Yes","Yes"$/);
+    expect(withReview[2]).toMatch(/"Yes","No"$/);
+  });
+});

@@ -31,3 +31,36 @@ test('workspace and entry dialog have no WCAG A/AA violations', async ({
     })),
   ).toEqual([]);
 });
+test('weekly review with an active selection has no WCAG A/AA violations', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Manage data', exact: true }).click();
+  await page.getByRole('button', { name: /Open pilot workspace/ }).click();
+  await page.getByRole('button', { name: 'Replace and restore' }).click();
+  await page
+    .getByRole('button', { name: 'Weekly review', exact: true })
+    .click();
+  await page
+    .getByRole('checkbox', { name: 'Select Shareholder agreement review' })
+    .check();
+  await page.getByLabel('Bulk action', { exact: true }).selectOption('client');
+  await page
+    .getByLabel('Destination client', { exact: true })
+    .selectOption('foundation');
+  await expect(page.getByTestId('action-scope')).toContainText(
+    'will need review again',
+  );
+  const review = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(
+    review.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => ({
+        target: n.target,
+        summary: n.failureSummary,
+      })),
+    })),
+  ).toEqual([]);
+});

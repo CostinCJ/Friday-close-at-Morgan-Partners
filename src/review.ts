@@ -11,7 +11,10 @@ export type ReviewFilters = {
 export type EntryPatch = Partial<
   Pick<Entry, 'clientId' | 'billable' | 'reviewed'>
 >;
-export type UndoRecord = { before: Data; ids: string[] };
+// Per-entry before/after copies of one review action. Undo restores only these
+// entries, and only while they still match `after`, so newer work is never
+// silently overwritten.
+export type UndoRecord = { label: string; before: Entry[]; after: Entry[] };
 
 export function selectWeek(entries: Entry[], week: string) {
   return entries.filter(
@@ -90,12 +93,52 @@ export function updateEntries(
     ...data,
     entries: data.entries.map((entry) => {
       if (!selected.has(entry.id)) return entry;
-      const merged = { ...entry, ...patch };
+      // Same rule as the edit form: a correction to a reviewed entry sends it
+      // back to review; an explicit review/reopen patch sets the state.
+      const merged = applyEntryUpdate(entry, { ...entry, ...patch });
+      if (patch.reviewed !== undefined) merged.reviewed = patch.reviewed;
       validateEntry(merged, data.clients);
       return merged;
     }),
   };
 }
-export function undoEntries(operation: UndoRecord): Data {
-  return operation.before;
+function sameEntry(a: Entry, b: Entry) {
+  return (
+    a.date === b.date &&
+    a.minutes === b.minutes &&
+    a.clientId === b.clientId &&
+    a.billable === b.billable &&
+    a.description === b.description &&
+    a.employee === b.employee &&
+    !!a.reviewed === !!b.reviewed
+  );
+}
+export function createUndoRecord(
+  before: Data,
+  after: Data,
+  ids: string[],
+  label: string,
+): UndoRecord {
+  const pick = (data: Data) => data.entries.filter((e) => ids.includes(e.id));
+  return { label, before: pick(before), after: pick(after) };
+}
+export function undoEntries(data: Data, operation: UndoRecord): Data {
+  const conflicts = operation.after.flatMap((expected) => {
+    const current = data.entries.find((e) => e.id === expected.id);
+    if (!current)
+      return [`“${expected.description || 'An entry'}” no longer exists`];
+    return sameEntry(current, expected)
+      ? []
+      : [`“${expected.description || 'An entry'}” changed after that action`];
+  });
+  if (conflicts.length)
+    throw new Error(
+      `Can’t undo: ${conflicts.join('; ')}. Nothing was undone, so newer work is kept.`,
+    );
+  const before = new Map(operation.before.map((e) => [e.id, e]));
+  for (const entry of operation.before) validateEntry(entry, data.clients);
+  return {
+    ...data,
+    entries: data.entries.map((e) => before.get(e.id) ?? e),
+  };
 }

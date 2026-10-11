@@ -26,7 +26,7 @@ export function EntryForm({
   );
   const [clientName, setClientName] = useState('');
   const [description, setDescription] = useState(entry?.description ?? '');
-  const [billable, setBillable] = useState(true);
+  const [billable, setBillable] = useState(entry?.billable ?? true);
   const [error, setError] = useState('');
   return (
     <Modal
@@ -65,7 +65,12 @@ export function EntryForm({
               minutes: Number(hours) * 60 + Number(minutes),
               clientId: client?.id ?? clientId,
               billable,
-              description: description.trim(),
+              // Keep an untouched description byte-for-byte so an unchanged
+              // save does not count as a correction and drop review.
+              description:
+                description === entry?.description
+                  ? entry.description
+                  : description.trim(),
               employee: entry?.employee ?? EMPLOYEE,
             };
             validateEntry(next, client ? [...clients, client] : clients);

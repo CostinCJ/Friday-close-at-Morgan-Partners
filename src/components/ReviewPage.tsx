@@ -21,8 +21,8 @@ import {
   weekStart,
 } from '../model';
 import {
+  createUndoRecord,
   selectReview,
-  selectWeek,
   undoEntries,
   updateEntries,
 } from '../review';
@@ -57,7 +57,6 @@ export function ReviewPage({
   const [operation, setOperation] = useState<UndoRecord | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const weekEntries = selectWeek(data.entries, week);
   const visible = selectReview(data.entries, data.clients, {
     week,
     clientId,
@@ -65,25 +64,49 @@ export function ReviewPage({
     status,
     search,
   });
-  const summaryEntries = weekEntries;
-  const exportEntries = weekEntries;
-  const summary = totals(summaryEntries);
-  const selectedIds = selected.filter((id) =>
-    data.entries.some((e) => e.id === id),
-  );
+  // Totals, export and actions all work on the rows in view, never on
+  // rows hidden by the week or filters.
+  const summary = totals(visible);
+  const exportEntries = visible;
+  const selectedEntries = visible.filter((e) => selected.includes(e.id));
+  const selectedIds = selectedEntries.map((e) => e.id);
   const employees = [...new Set(data.entries.map((e) => e.employee))].sort();
+  const targetName =
+    data.clients.find((c) => c.id === targetClient)?.name ?? 'client';
+  const patch: EntryPatch =
+    action === 'client'
+      ? { clientId: targetClient }
+      : action === 'review' || action === 'reopen'
+        ? { reviewed: action === 'review' }
+        : { billable: action === 'billable' };
+  const actionName =
+    action === 'client' ? `Move to ${targetName}` : ACTION_NAMES[action];
+  const reopening = reopenedBy(selectedEntries, patch).length;
   function changeView(update: () => void) {
     update();
-  }
-  function apply(ids: string[], patch: EntryPatch) {
-    setError('');
-    try {
-      const next = updateEntries(data, ids, patch);
-      save(next);
-      setOperation({ before: data, ids });
+    if (selected.length) {
       setSelected([]);
+      setMessage('Selection cleared because the view changed.');
+    }
+  }
+  function apply(
+    entries: Entry[],
+    change: EntryPatch,
+    { keepSelection = false } = {},
+  ) {
+    setError('');
+    const ids = entries.map((e) => e.id);
+    try {
+      const next = updateEntries(data, ids, change);
+      const label = describeAction(change, ids.length, data);
+      const reopened = reopenedBy(entries, change).length;
+      save(next);
+      setOperation(createUndoRecord(data, next, ids, label));
+      if (!keepSelection) setSelected([]);
       setMessage(
-        `Updated ${ids.length} ${ids.length === 1 ? 'entry' : 'entries'}.`,
+        reopened
+          ? `${label}. ${count(reopened, 'reviewed entry', 'reviewed entries')} ${reopened === 1 ? 'needs' : 'need'} review again.`
+          : `${label}.`,
       );
     } catch (e) {
       setError((e as Error).message);
@@ -129,7 +152,9 @@ export function ReviewPage({
               `counsel-review-${week}.csv`,
               'text/csv;charset=utf-8',
             );
-            setMessage(`Exported ${exportEntries.length} entries.`);
+            setMessage(
+              `Exported ${count(exportEntries.length, 'entry', 'entries')} in this view.`,
+            );
           }}
         >
           <ArrowDownToLine size={16} />
@@ -257,19 +282,25 @@ export function ReviewPage({
           <button
             className="button primary small"
             disabled={!selectedIds.length || readOnly}
-            onClick={() =>
-              apply(
-                selectedIds,
-                action === 'client'
-                  ? { clientId: targetClient }
-                  : action === 'review' || action === 'reopen'
-                    ? { reviewed: action === 'review' }
-                    : { billable: action === 'billable' },
-              )
-            }
+            onClick={() => apply(selectedEntries, patch)}
           >
             Apply to {selectedIds.length} selected
           </button>
+          <p className="action-scope" data-testid="action-scope">
+            {selectedIds.length ? (
+              <>
+                <strong>
+                  {actionName}: {count(selectedIds.length, 'entry', 'entries')}{' '}
+                  ({duration(totals(selectedEntries).total)})
+                </strong>
+                {' · highlighted below'}
+                {reopening > 0 &&
+                  ` · ${count(reopening, 'reviewed entry', 'reviewed entries')} will need review again`}
+              </>
+            ) : (
+              'Select entries in this view to update them. Actions only change selected rows shown below.'
+            )}
+          </p>
         </div>
         {error && (
           <p className="form-error review-feedback" role="alert">
@@ -284,17 +315,18 @@ export function ReviewPage({
               disabled={readOnly}
               onClick={() => {
                 try {
-                  save(undoEntries(operation));
-                  setOperation(null);
+                  save(undoEntries(data, operation));
                   setError('');
-                  setMessage('Last review action undone.');
+                  setMessage(`Undone: ${operation.label}.`);
                 } catch (e) {
                   setError((e as Error).message);
+                  setMessage('');
                 }
+                setOperation(null);
               }}
             >
               <Undo2 size={14} />
-              Undo last action
+              Undo: {operation.label}
             </button>
           )}
         </div>
@@ -310,7 +342,7 @@ export function ReviewPage({
               const client = data.clients.find((c) => c.id === entry.clientId)!;
               return (
                 <article
-                  className="review-row"
+                  className={`review-row ${selectedIds.includes(entry.id) ? 'is-selected' : ''}`}
                   data-entry-id={entry.id}
                   key={entry.id}
                 >
@@ -351,7 +383,11 @@ export function ReviewPage({
                     disabled={readOnly}
                     aria-label={`${entry.reviewed ? 'Reopen' : 'Review'} ${entry.description || client.name}`}
                     onClick={() =>
-                      apply([entry.id], { reviewed: !entry.reviewed })
+                      apply(
+                        [entry],
+                        { reviewed: !entry.reviewed },
+                        { keepSelection: true },
+                      )
                     }
                   >
                     {entry.reviewed && <Check size={13} />}{' '}
@@ -375,9 +411,40 @@ export function ReviewPage({
             {visible.length} entries · {shortDate(week)} –{' '}
             {shortDate(addDays(week, 6))}
           </span>
-          <span>Export includes all entries in this view.</span>
+          <span>
+            Export includes the {count(visible.length, 'entry', 'entries')} in
+            this view, not just the selection.
+          </span>
         </div>
       </div>
     </section>
   );
+}
+const ACTION_NAMES: Record<string, string> = {
+  review: 'Mark reviewed',
+  reopen: 'Return to review',
+  billable: 'Mark billable',
+  nonbillable: 'Mark non-billable',
+};
+function count(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+// Reviewed entries whose checked values a correction would actually change.
+function reopenedBy(entries: Entry[], patch: EntryPatch) {
+  return entries.filter(
+    (e) =>
+      e.reviewed &&
+      ((patch.clientId !== undefined && patch.clientId !== e.clientId) ||
+        (patch.billable !== undefined && patch.billable !== e.billable)),
+  );
+}
+function describeAction(patch: EntryPatch, n: number, data: Data) {
+  const entries = count(n, 'entry', 'entries');
+  if (patch.clientId !== undefined)
+    return `Moved ${entries} to ${data.clients.find((c) => c.id === patch.clientId)?.name ?? 'another client'}`;
+  if (patch.billable !== undefined)
+    return `Marked ${entries} ${patch.billable ? 'billable' : 'non-billable'}`;
+  return patch.reviewed
+    ? `Marked ${entries} reviewed`
+    : `Returned ${entries} to review`;
 }

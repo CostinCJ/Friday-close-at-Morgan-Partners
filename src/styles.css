@@ -984,7 +984,8 @@ tbody tr:hover {
 }
 .page-footer > span:first-child {
   display: flex;
-  align-items: center;
+  /* Baseline, not center: the 17px "c." and 10px text share a baseline. */
+  align-items: baseline;
   gap: 9px;
 }
 .mini-brand {

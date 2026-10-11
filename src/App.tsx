@@ -43,6 +43,7 @@ import { ClientForm } from './components/ClientForm';
 import { Stat } from './components/Stat';
 import { ReviewPage } from './components/ReviewPage';
 import { saveEntry } from './review';
+import type { UndoRecord } from './review';
 import pilotWorkspace from './fixtures/pilot-workspace.json';
 import { EntryTable } from './components/EntryTable';
 type Toast = { text: string; undo?: () => void };
@@ -63,6 +64,7 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [pendingRestore, setPendingRestore] = useState<Data | null>(null);
   const [utilityError, setUtilityError] = useState('');
+  const [reviewUndo, setReviewUndo] = useState<UndoRecord | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!toast) return;
@@ -229,6 +231,8 @@ export default function App() {
               save={save}
               onEdit={setEntryModal}
               readOnly={!!storageError}
+              operation={reviewUndo}
+              setOperation={setReviewUndo}
             />
           ) : page !== 'clients' ? (
             <>
@@ -931,6 +935,7 @@ export default function App() {
                     onClick={() => {
                       try {
                         save(pendingRestore, true);
+                        setReviewUndo(null);
                         setPendingRestore(null);
                         setUtilityModal(null);
                         setPage('entries');

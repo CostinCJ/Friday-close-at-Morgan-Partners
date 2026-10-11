@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { decodeData } from '../model';
 import type { Data } from '../model';
+import type { UndoRecord } from '../review';
 import pilotWorkspace from '../fixtures/pilot-workspace.json';
 import { ReviewPage } from './ReviewPage';
 
@@ -16,9 +17,14 @@ vi.mock('../model', async (importOriginal) => ({
 let latest: Data;
 // Stands in for an edit made outside the review actions (the entry form).
 let editElsewhere: (id: string, change: Partial<Data['entries'][0]>) => void;
+let leaveAndReturn: () => void;
 function Harness({ initial }: { initial: Data }) {
   const [data, setData] = useState(initial);
+  const [operation, setOperation] = useState<UndoRecord | null>(null);
+  const [visit, setVisit] = useState(0);
   latest = data;
+  // Unmounts and remounts ReviewPage, like visiting another page and back.
+  leaveAndReturn = () => act(() => setVisit((v) => v + 1));
   editElsewhere = (id, change) =>
     act(() =>
       setData((d) => ({
@@ -28,10 +34,13 @@ function Harness({ initial }: { initial: Data }) {
     );
   return (
     <ReviewPage
+      key={visit}
       data={data}
       save={(next) => setData(next)}
       onEdit={() => {}}
       readOnly={false}
+      operation={operation}
+      setOperation={setOperation}
     />
   );
 }
@@ -352,5 +361,37 @@ describe('Search typos keep the selection', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
     ).toBeChecked();
+  });
+});
+
+describe('Export and undo across visits', () => {
+  it('Export view includes each row’s review status', async () => {
+    const user = setup();
+    await user.selectOptions(screen.getByLabelText('Review client'), 'oak');
+    await user.click(screen.getByRole('button', { name: /Export view/ }));
+    const lines = downloads[0].trim().split('\r\n');
+    expect(lines[0]).toMatch(/"Reviewed"$/);
+    // Oak & Stone: entry-004 (needs review), entry-009 and entry-015 (reviewed).
+    expect(lines.slice(1).map((l) => l.split(',').at(-1))).toEqual([
+      '"No"',
+      '"Yes"',
+      '"Yes"',
+    ]);
+  });
+  it('the last review action can still be undone after leaving and returning', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: /Apply to 1 selected/ }),
+    );
+    leaveAndReturn();
+    await user.click(
+      screen.getByRole('button', { name: /Undo: Marked 1 entry reviewed/ }),
+    );
+    expect(latest.entries.find((e) => e.id === 'entry-002')!.reviewed).toBe(
+      false,
+    );
   });
 });

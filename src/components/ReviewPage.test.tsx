@@ -97,7 +97,7 @@ describe('Weekly review totals and export follow the active view', () => {
 });
 
 describe('Selection scope', () => {
-  it('clears selection when the view changes, so hidden rows are never acted on', async () => {
+  it('deselects rows a filter hides, says so, and does not reselect them later', async () => {
     const user = setup();
     await user.selectOptions(
       screen.getByLabelText('Review client'),
@@ -111,11 +111,52 @@ describe('Selection scope', () => {
     );
     expect(screen.getByText('0 selected')).toBeInTheDocument();
     expect(
-      screen.getByText(/Selection cleared because the view changed/),
+      screen.getByText(
+        'Deselected 5 entries no longer in this view. 0 entries still selected.',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /Apply to 0 selected/ }),
     ).toBeDisabled();
+    // Widening the view again must not silently bring the selection back.
+    await user.selectOptions(screen.getByLabelText('Review client'), 'all');
+    expect(screen.getByText('0 selected')).toBeInTheDocument();
+  });
+  it('keeps selected rows that are still in view when narrowing', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select Shareholder agreement review',
+      }),
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    );
+    await user.selectOptions(
+      screen.getByLabelText('Review client'),
+      'meridian',
+    );
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'Select Shareholder agreement review',
+      }),
+    ).toBeChecked();
+    expect(
+      screen.getByText(
+        'Deselected 1 entry no longer in this view. 1 entry still selected.',
+      ),
+    ).toBeInTheDocument();
+  });
+  it('typing a search that still matches keeps the selection without a notice', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    );
+    await user.type(screen.getByLabelText('Search review'), 'planning');
+    expect(rows()).toEqual(['entry-002']);
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(screen.queryByText(/Deselected/)).not.toBeInTheDocument();
   });
   it('describes which records the next action will change before applying it', async () => {
     const user = setup();

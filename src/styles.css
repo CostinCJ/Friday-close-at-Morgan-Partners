@@ -2611,3 +2611,8 @@ tbody tr:hover {
   background: #f4f2fa;
   box-shadow: inset 3px 0 0 var(--accent);
 }
+/* The tint lowers contrast of the grey meta text; darken it to stay >= 4.5:1. */
+.review-row.is-selected .review-entry-meta span,
+.review-row.is-selected .review-employee {
+  color: #555d6c;
+}

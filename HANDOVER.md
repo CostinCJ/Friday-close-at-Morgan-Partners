@@ -11,20 +11,21 @@ All three reports were real defects:
 **Friday workflow:** selected rows stayed selected when filtered out of view, so **Apply** changed records Sofia couldn't see. Now:
 
 - Actions only touch visible, highlighted rows.
-- Narrowing deselects only hidden rows, and says so.
+- Filters deselect only rows they hide, with a notice; search keeps hidden picks (reported), so a typo loses nothing.
 - A scope line states the effect first ("Move to Meridian Foundation: 2 entries (2h 15m) · 1 reviewed entry will need review again").
 - Undo names the action it reverses.
+- "Show N needing review" filters to what is left; "Nothing left to review" marks a view ready for billing.
 
 ## Verified
 
-- Unit tests: 48 pass, 20 new. 17 of the new ones fail on the original code.
-- Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check of Weekly review. That check caught a contrast regression from the row highlight, now fixed.
+- Unit tests: 54 pass, 26 new. 17 of the 20 covering the reports and selection fail on the original code.
+- Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
 - Manual: each report path walked through; the exported CSV matched the view; no sideways scroll at 375px.
-- CI runs formatting, tests, build and browser tests on every push and PR, and `main` requires them to pass.
+- CI runs all of these on every PR; `main` requires them to pass.
 
 ## Remaining
 
-- Deferred: dark theme, repeat yesterday, and a needs-review shortcut (the status filter covers it).
+- Deferred: dark theme and repeat yesterday. Neither helps the Friday close.
 - Undo is single-step and lost when you leave the page.
 - The CSV has no Reviewed column.
 

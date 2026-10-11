@@ -59,12 +59,22 @@ export function ReviewPage({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const visible = selectReview(data.entries, data.clients, filters);
+  // Rows the "needing review" shortcut would show: same filters, any status.
+  const needsReview = selectReview(data.entries, data.clients, {
+    ...filters,
+    status: 'pending',
+  }).length;
   // Totals, export and actions all work on the rows in view, never on
   // rows hidden by the week or filters.
   const summary = totals(visible);
   const exportEntries = visible;
   const selectedEntries = visible.filter((e) => selected.includes(e.id));
   const selectedIds = selectedEntries.map((e) => e.id);
+  // Selected rows the current view hides (e.g. by a half-typed search).
+  // They stay selected, are reported below, and no action touches them.
+  const hiddenSelected = selected.filter(
+    (id) => !selectedIds.includes(id) && data.entries.some((e) => e.id === id),
+  ).length;
   const employees = [...new Set(data.entries.map((e) => e.employee))].sort();
   const targetName =
     data.clients.find((c) => c.id === targetClient)?.name ?? 'client';
@@ -81,12 +91,19 @@ export function ReviewPage({
   // so, so an action can never reach a row the user cannot see.
   function changeView(change: Partial<ReviewFilters>) {
     const next = { ...filters, ...change };
+    setFilters(next);
+    // Search changes on every keystroke, so a typo must not drop picks:
+    // rows it hides stay selected (and are reported). Deliberate changes
+    // (week, client, team member, status) deselect what they hide.
+    if (Object.keys(change).every((key) => key === 'search')) return;
     const stillVisible = new Set(
       selectReview(data.entries, data.clients, next).map((e) => e.id),
     );
-    const kept = selectedIds.filter((id) => stillVisible.has(id));
-    const dropped = selectedIds.length - kept.length;
-    setFilters(next);
+    const existing = selected.filter((id) =>
+      data.entries.some((e) => e.id === id),
+    );
+    const kept = existing.filter((id) => stillVisible.has(id));
+    const dropped = existing.length - kept.length;
     setSelected(kept);
     if (dropped)
       setMessage(
@@ -106,7 +123,8 @@ export function ReviewPage({
       const reopened = reopenedBy(entries, change).length;
       save(next);
       setOperation(createUndoRecord(data, next, ids, label));
-      if (!keepSelection) setSelected([]);
+      if (!keepSelection)
+        setSelected((current) => current.filter((id) => !ids.includes(id)));
       setMessage(
         reopened
           ? `${label}. ${count(reopened, 'reviewed entry', 'reviewed entries')} ${reopened === 1 ? 'needs' : 'need'} review again.`
@@ -192,6 +210,27 @@ export function ReviewPage({
           <strong>
             {visible.filter((e) => e.reviewed).length} / {visible.length}
           </strong>
+          {filters.status === 'pending' ? (
+            <button
+              className="text-button summary-link"
+              onClick={() => changeView({ status: 'all' })}
+            >
+              Show all review states
+            </button>
+          ) : needsReview > 0 ? (
+            <button
+              className="text-button summary-link"
+              onClick={() => changeView({ status: 'pending' })}
+            >
+              Show {needsReview} needing review
+            </button>
+          ) : (
+            visible.length > 0 && (
+              <p className="summary-note">
+                Nothing left to review in this view
+              </p>
+            )
+          )}
         </div>
       </div>
       <div className="entries-panel">
@@ -252,9 +291,11 @@ export function ReviewPage({
                 visible.length > 0 && selectedIds.length === visible.length
               }
               disabled={!visible.length || readOnly}
-              onChange={(e) =>
-                setSelected(e.target.checked ? visible.map((e) => e.id) : [])
-              }
+              onChange={(e) => {
+                const shown = visible.map((entry) => entry.id);
+                const others = selected.filter((id) => !shown.includes(id));
+                setSelected(e.target.checked ? [...others, ...shown] : others);
+              }}
             />
             Select visible
           </label>
@@ -304,6 +345,8 @@ export function ReviewPage({
             ) : (
               'Select entries in this view to update them. Actions only change selected rows shown below.'
             )}
+            {hiddenSelected > 0 &&
+              ` · ${hiddenSelected} more selected but hidden by this view (won’t change)`}
           </p>
         </div>
         {error && (

@@ -18,10 +18,10 @@ All three reports were real defects:
 
 ## Verified
 
-- Unit tests: 52 pass, 24 new. Of the 20 covering the reports and selection, 17 fail on the original code; 4 cover the shortcut.
-- Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check of Weekly review. That check caught a contrast regression from the row highlight, now fixed.
+- Unit tests: 52 pass, 24 new. 17 of the 20 covering the reports and selection fail on the original code.
+- Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
 - Manual: each report path walked through; the exported CSV matched the view; no sideways scroll at 375px.
-- CI runs formatting, tests, build and browser tests on every push and PR, and `main` requires them to pass.
+- CI runs all of these on every PR; `main` requires them to pass.
 
 ## Remaining
 

@@ -312,3 +312,45 @@ describe('Needs-review shortcut', () => {
     expect(screen.queryByRole('button', { name: /needing review/ })).toBeNull();
   });
 });
+
+describe('Search typos keep the selection', () => {
+  it('a mistyped then corrected search keeps the selected row, and says so meanwhile', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    );
+    const search = screen.getByLabelText('Search review');
+    await user.type(search, 'plx');
+    expect(rows()).toEqual([]);
+    expect(screen.getByTestId('action-scope')).toHaveTextContent(
+      '1 more selected but hidden by this view',
+    );
+    expect(screen.queryByText(/Deselected/)).not.toBeInTheDocument();
+    await user.type(search, '{Backspace}anning');
+    expect(rows()).toEqual(['entry-002']);
+    expect(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    ).toBeChecked();
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+  });
+  it('actions and Select visible never drop rows hidden by search', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    );
+    await user.type(screen.getByLabelText('Search review'), 'lease');
+    expect(rows()).toEqual(['entry-004', 'entry-009']);
+    await user.click(screen.getByLabelText('Select visible entries'));
+    await user.click(
+      screen.getByRole('button', { name: /Apply to 2 selected/ }),
+    );
+    // Only the two visible lease entries changed; the hidden pick stays.
+    expect(latest.entries.find((e) => e.id === 'entry-002')!.reviewed).toBe(
+      false,
+    );
+    await user.clear(screen.getByLabelText('Search review'));
+    expect(
+      screen.getByRole('checkbox', { name: 'Select Weekly team planning' }),
+    ).toBeChecked();
+  });
+});

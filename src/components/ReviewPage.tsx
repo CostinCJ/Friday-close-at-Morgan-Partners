@@ -26,7 +26,7 @@ import {
   undoEntries,
   updateEntries,
 } from '../review';
-import type { EntryPatch, UndoRecord } from '../review';
+import type { EntryPatch, ReviewFilters, UndoRecord } from '../review';
 
 export function ReviewPage({
   data,
@@ -39,31 +39,26 @@ export function ReviewPage({
   onEdit: (entry: Entry) => void;
   readOnly: boolean;
 }) {
-  const [week, setWeek] = useState(() =>
-    weekStart(
+  const [filters, setFilters] = useState<ReviewFilters>(() => ({
+    week: weekStart(
       data.entries
         .map((e) => e.date)
         .sort()
         .at(-1) ?? localDate(),
     ),
-  );
-  const [clientId, setClientId] = useState('all');
-  const [employee, setEmployee] = useState('all');
-  const [status, setStatus] = useState('all');
-  const [search, setSearch] = useState('');
+    clientId: 'all',
+    employee: 'all',
+    status: 'all',
+    search: '',
+  }));
+  const { week } = filters;
   const [selected, setSelected] = useState<string[]>([]);
   const [action, setAction] = useState('review');
   const [targetClient, setTargetClient] = useState(data.clients[0]?.id ?? '');
   const [operation, setOperation] = useState<UndoRecord | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const visible = selectReview(data.entries, data.clients, {
-    week,
-    clientId,
-    employee,
-    status,
-    search,
-  });
+  const visible = selectReview(data.entries, data.clients, filters);
   // Totals, export and actions all work on the rows in view, never on
   // rows hidden by the week or filters.
   const summary = totals(visible);
@@ -82,12 +77,21 @@ export function ReviewPage({
   const actionName =
     action === 'client' ? `Move to ${targetName}` : ACTION_NAMES[action];
   const reopening = reopenedBy(selectedEntries, patch).length;
-  function changeView(update: () => void) {
-    update();
-    if (selected.length) {
-      setSelected([]);
-      setMessage('Selection cleared because the view changed.');
-    }
+  // Keep selected rows the new view still shows; deselect the rest and say
+  // so, so an action can never reach a row the user cannot see.
+  function changeView(change: Partial<ReviewFilters>) {
+    const next = { ...filters, ...change };
+    const stillVisible = new Set(
+      selectReview(data.entries, data.clients, next).map((e) => e.id),
+    );
+    const kept = selectedIds.filter((id) => stillVisible.has(id));
+    const dropped = selectedIds.length - kept.length;
+    setFilters(next);
+    setSelected(kept);
+    if (dropped)
+      setMessage(
+        `Deselected ${count(dropped, 'entry', 'entries')} no longer in this view. ${count(kept.length, 'entry', 'entries')} still selected.`,
+      );
   }
   function apply(
     entries: Entry[],
@@ -119,7 +123,7 @@ export function ReviewPage({
           <button
             className="icon-button"
             aria-label="Previous review week"
-            onClick={() => changeView(() => setWeek(addDays(week, -7)))}
+            onClick={() => changeView({ week: addDays(week, -7) })}
           >
             <ChevronLeft size={18} />
           </button>
@@ -131,14 +135,14 @@ export function ReviewPage({
               value={week}
               onChange={(e) =>
                 e.target.value &&
-                changeView(() => setWeek(weekStart(e.target.value)))
+                changeView({ week: weekStart(e.target.value) })
               }
             />
           </label>
           <button
             className="icon-button"
             aria-label="Next review week"
-            onClick={() => changeView(() => setWeek(addDays(week, 7)))}
+            onClick={() => changeView({ week: addDays(week, 7) })}
           >
             <ChevronRight size={18} />
           </button>
@@ -203,14 +207,14 @@ export function ReviewPage({
             <input
               aria-label="Search review"
               placeholder="Find an entry…"
-              value={search}
-              onChange={(e) => changeView(() => setSearch(e.target.value))}
+              value={filters.search}
+              onChange={(e) => changeView({ search: e.target.value })}
             />
           </label>
           <select
             aria-label="Review client"
-            value={clientId}
-            onChange={(e) => changeView(() => setClientId(e.target.value))}
+            value={filters.clientId}
+            onChange={(e) => changeView({ clientId: e.target.value })}
           >
             <option value="all">All clients</option>
             {data.clients.map((c) => (
@@ -221,8 +225,8 @@ export function ReviewPage({
           </select>
           <select
             aria-label="Review employee"
-            value={employee}
-            onChange={(e) => changeView(() => setEmployee(e.target.value))}
+            value={filters.employee}
+            onChange={(e) => changeView({ employee: e.target.value })}
           >
             <option value="all">All team members</option>
             {employees.map((name) => (
@@ -231,8 +235,8 @@ export function ReviewPage({
           </select>
           <select
             aria-label="Review status"
-            value={status}
-            onChange={(e) => changeView(() => setStatus(e.target.value))}
+            value={filters.status}
+            onChange={(e) => changeView({ status: e.target.value })}
           >
             <option value="all">All review states</option>
             <option value="pending">Needs review</option>

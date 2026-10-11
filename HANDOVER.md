@@ -13,12 +13,13 @@ All three reports were real defects:
 - Actions only touch visible, highlighted rows.
 - Filters deselect only rows they hide, with a notice; search keeps hidden picks (reported), so a typo loses nothing.
 - A scope line states the effect first ("Move to Meridian Foundation: 2 entries (2h 15m) · 1 reviewed entry will need review again").
-- Undo names the action it reverses.
+- Undo names the action it reverses and survives leaving the page.
 - "Show N needing review" filters to what is left; "Nothing left to review" marks a view ready for billing.
+- Export view adds a Reviewed column. (The footer logo is also now aligned.)
 
 ## Verified
 
-- Unit tests: 54 pass, 26 new. 17 of the 20 covering the reports and selection fail on the original code.
+- Unit tests: 57 pass, 29 new. Re-run against the original code, 23 of 26 fail; the other 3 are guards.
 - Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
 - Manual: each report path walked through; the exported CSV matched the view; no sideways scroll at 375px.
 - CI runs all of these on every PR; `main` requires them to pass.
@@ -26,12 +27,11 @@ All three reports were real defects:
 ## Remaining
 
 - Deferred: dark theme and repeat yesterday. Neither helps the Friday close.
-- Undo is single-step and lost when you leave the page.
-- The CSV has no Reviewed column.
+- Undo is single-step and lost on reload.
 
 ## Release recommendation
 
-Yes for the pilot, noting the undo limits.
+Yes for the pilot, noting that undo is single-step.
 
 ## AI use
 

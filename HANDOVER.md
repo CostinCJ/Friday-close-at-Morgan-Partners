@@ -2,37 +2,35 @@
 
 ## Changed
 
-All three reports were real defects:
+Each report traced to a root cause and fixed with a regression test:
 
-- **Edit made entry billable (Alex):** the [edit form](src/components/EntryForm.tsx) always started with "Billable" on. It now loads the saved value. Unchanged saves keep their review.
-- **Totals and export (Sofia):** both used the whole week. They now use exactly the filtered rows.
-- **Corrections and undo (Sofia):** bulk client/billability corrections kept "Reviewed"; they now require review again ([review.ts](src/review.ts)). Undo restored the whole workspace and erased later edits. It now reverts only the entries that action touched, and declines with an explanation if any changed since.
+- **Alex – edit made entry billable:** the [edit form](src/components/EntryForm.tsx) started "Billable" as `true` instead of the saved value. Unchanged saves now keep review.
+- **Sofia – totals/export:** both read the whole week, not the filtered rows. Both now use the visible rows.
+- **Sofia – corrections/undo:** bulk client/billability changes never reset "Reviewed"; they now follow the edit form's rule ([review.ts](src/review.ts)). Undo restored a whole-workspace snapshot, erasing later edits. It now reverts only the touched entries, and declines with an explanation if any changed since.
 
-**Friday workflow:** selected rows stayed selected when filtered out of view, so **Apply** changed records Sofia couldn't see. Now:
+**Friday review, before:** "Apply to N selected" could change rows hidden by filters, with no way to tell which. **After:**
 
-- Actions only touch visible, highlighted rows.
-- Filters deselect only rows they hide, with a notice; search keeps hidden picks (reported), so a typo loses nothing.
-- A scope line states the effect first ("Move to Meridian Foundation: 2 entries (2h 15m) · 1 reviewed entry will need review again").
-- Undo names the action it reverses and survives leaving the page.
-- "Show N needing review" filters to what is left; "Nothing left to review" marks a view ready for billing.
-- Export view adds a Reviewed column; the page and chosen weeks survive a refresh. (Footer logo aligned.)
+- Actions touch only visible, highlighted rows.
+- A scope line states the effect ("Move to Meridian Foundation: 2 entries (2h 15m) · 1 reviewed entry will need review again").
+- Filters deselect rows they hide, with a notice; search keeps picks, so a typo loses nothing.
+- "Show N needing review" jumps to what is left.
+- Also: a Reviewed column in Export view, undo survives page changes, and the page and week survive a refresh.
 
 ## Verified
 
-- Unit tests: 57 pass, 29 new. Re-run against the original code, 23 of 26 fail; the other 3 are guards.
-- Browser tests: 16/16 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
-- Manual: each report path walked through; the exported CSV matched the view; no sideways scroll at 375px.
-- CI runs all of these on every PR; `main` requires them to pass.
+- `npm run check`: 57 unit tests (29 new) and the build pass. 23 of the 26 measured new tests fail on the original code.
+- `npm run test:e2e`: 16/16 on desktop and mobile Chromium, including the [pilot-week flow](tests/review.spec.ts) and axe, which caught a contrast regression from my row highlight (fixed).
+- Manual: every report path, the CSV contents, and the layout at 375px. CI gates every PR into `main`.
+- Not established: real Safari/iOS, the CSV opened in Excel, two tabs editing during an undo.
 
 ## Remaining
 
-- Deferred: dark theme and repeat yesterday. Neither helps the Friday close.
-- Undo is single-step and lost on reload.
+Deferred dark theme and repeat-yesterday; neither helps the Friday close. Undo is single-step and in memory.
 
 ## Release recommendation
 
-Yes for the pilot, noting that undo is single-step.
+Yes for the pilot, noting single-step undo.
 
 ## AI use
 
-I used Claude Code, and checked it with failing-first tests and my own browser walkthrough. Correction: its first undo test used a row toggle as the "independent" edit, which proved nothing; it now simulates an edit-form change.
+Claude Code wrote most of the code and tests; I set scope and tested in the browser. I caught its search design dropping selections on a typo, and it fixed that with a regression test. It also ran the new tests against the original code to show they fail.

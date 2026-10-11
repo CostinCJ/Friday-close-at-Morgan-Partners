@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowDownToLine,
   Check,
@@ -27,6 +27,12 @@ import {
   updateEntries,
 } from '../review';
 import type { EntryPatch, ReviewFilters, UndoRecord } from '../review';
+import {
+  isWeekStart,
+  readSession,
+  REVIEW_WEEK_KEY as REVIEW_WEEK,
+  writeSession,
+} from '../useSessionState';
 
 export function ReviewPage({
   data,
@@ -46,18 +52,22 @@ export function ReviewPage({
   setOperation: (operation: UndoRecord | null) => void;
 }) {
   const [filters, setFilters] = useState<ReviewFilters>(() => ({
-    week: weekStart(
-      data.entries
-        .map((e) => e.date)
-        .sort()
-        .at(-1) ?? localDate(),
-    ),
+    // The last week reviewed in this tab, else the latest week with entries.
+    week:
+      readSession(REVIEW_WEEK, isWeekStart) ??
+      weekStart(
+        data.entries
+          .map((e) => e.date)
+          .sort()
+          .at(-1) ?? localDate(),
+      ),
     clientId: 'all',
     employee: 'all',
     status: 'all',
     search: '',
   }));
   const { week } = filters;
+  useEffect(() => writeSession(REVIEW_WEEK, week), [week]);
   const [selected, setSelected] = useState<string[]>([]);
   const [action, setAction] = useState('review');
   const [targetClient, setTargetClient] = useState(data.clients[0]?.id ?? '');

@@ -34,6 +34,12 @@ import {
 } from './model';
 import type { Client, Data, Entry } from './model';
 import { useStore } from './useStore';
+import {
+  isWeekStart,
+  REVIEW_WEEK_KEY,
+  useSessionState,
+  writeSession,
+} from './useSessionState';
 import { Modal } from './components/Modal';
 import { EntryForm } from './components/EntryForm';
 
@@ -49,8 +55,18 @@ import { EntryTable } from './components/EntryTable';
 type Toast = { text: string; undo?: () => void };
 export default function App() {
   const { data, save, error: storageError } = useStore();
-  const [page, setPage] = useState<Page>('entries');
-  const [week, setWeek] = useState(weekStart(localDate()));
+  // Page and week survive a refresh in this tab (sessionStorage).
+  const [page, setPage] = useSessionState<Page>(
+    'counsel.view.page',
+    () => 'entries',
+    (value): value is Page =>
+      ['entries', 'review', 'reports', 'clients'].includes(value as string),
+  );
+  const [week, setWeek] = useSessionState(
+    'counsel.view.week',
+    () => weekStart(localDate()),
+    isWeekStart,
+  );
   const [range, setRange] = useState('week');
   const [search, setSearch] = useState('');
   const [clientFilter, setClientFilter] = useState('all');
@@ -936,6 +952,8 @@ export default function App() {
                       try {
                         save(pendingRestore, true);
                         setReviewUndo(null);
+                        // A restored workspace opens on its own latest week.
+                        writeSession(REVIEW_WEEK_KEY, null);
                         setPendingRestore(null);
                         setUtilityModal(null);
                         setPage('entries');

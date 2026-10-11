@@ -15,12 +15,12 @@ All three reports were real defects:
 - A scope line states the effect first ("Move to Meridian Foundation: 2 entries (2h 15m) · 1 reviewed entry will need review again").
 - Undo names the action it reverses and survives leaving the page.
 - "Show N needing review" filters to what is left; "Nothing left to review" marks a view ready for billing.
-- Export view adds a Reviewed column. (The footer logo is also now aligned.)
+- Export view adds a Reviewed column; the page and chosen weeks survive a refresh. (Footer logo aligned.)
 
 ## Verified
 
 - Unit tests: 57 pass, 29 new. Re-run against the original code, 23 of 26 fail; the other 3 are guards.
-- Browser tests: 14/14 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
+- Browser tests: 16/16 on desktop and mobile, including the [pilot-week flow](tests/review.spec.ts) and an axe check, which caught a contrast regression from the row highlight (fixed).
 - Manual: each report path walked through; the exported CSV matched the view; no sideways scroll at 375px.
 - CI runs all of these on every PR; `main` requires them to pass.
 

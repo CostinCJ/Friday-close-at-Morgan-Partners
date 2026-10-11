@@ -59,6 +59,11 @@ export function ReviewPage({
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const visible = selectReview(data.entries, data.clients, filters);
+  // Rows the "needing review" shortcut would show: same filters, any status.
+  const needsReview = selectReview(data.entries, data.clients, {
+    ...filters,
+    status: 'pending',
+  }).length;
   // Totals, export and actions all work on the rows in view, never on
   // rows hidden by the week or filters.
   const summary = totals(visible);
@@ -192,6 +197,27 @@ export function ReviewPage({
           <strong>
             {visible.filter((e) => e.reviewed).length} / {visible.length}
           </strong>
+          {filters.status === 'pending' ? (
+            <button
+              className="text-button summary-link"
+              onClick={() => changeView({ status: 'all' })}
+            >
+              Show all review states
+            </button>
+          ) : needsReview > 0 ? (
+            <button
+              className="text-button summary-link"
+              onClick={() => changeView({ status: 'pending' })}
+            >
+              Show {needsReview} needing review
+            </button>
+          ) : (
+            visible.length > 0 && (
+              <p className="summary-note">
+                Nothing left to review in this view
+              </p>
+            )
+          )}
         </div>
       </div>
       <div className="entries-panel">

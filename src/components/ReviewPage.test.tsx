@@ -257,3 +257,58 @@ describe('Corrections and undo from the review page', () => {
     });
   });
 });
+
+describe('Needs-review shortcut', () => {
+  it('shows only the entries still needing review, then returns to all states', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('button', { name: 'Show 11 needing review' }),
+    );
+    expect(rows()).toHaveLength(11);
+    expect(screen.getByLabelText('Review status')).toHaveValue('pending');
+    await user.click(
+      screen.getByRole('button', { name: 'Show all review states' }),
+    );
+    expect(rows()).toHaveLength(18);
+    expect(screen.getByLabelText('Review status')).toHaveValue('all');
+  });
+  it('counts what the shortcut would show even while viewing reviewed entries', async () => {
+    const user = setup();
+    await user.selectOptions(
+      screen.getByLabelText('Review status'),
+      'reviewed',
+    );
+    expect(rows()).toHaveLength(7);
+    expect(
+      screen.getByRole('button', { name: 'Show 11 needing review' }),
+    ).toBeInTheDocument();
+  });
+  it('follows the selection rules and announces deselected rows', async () => {
+    const user = setup();
+    await user.click(
+      screen.getByRole('checkbox', {
+        name: 'Select Shareholder agreement review',
+      }),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Show 11 needing review' }),
+    );
+    expect(
+      screen.getByText(
+        'Deselected 1 entry no longer in this view. 0 entries still selected.',
+      ),
+    ).toBeInTheDocument();
+  });
+  it('says when nothing is left to review in the view', async () => {
+    const user = setup();
+    await user.selectOptions(screen.getByLabelText('Review client'), 'oak');
+    await user.click(screen.getByLabelText('Select visible entries'));
+    await user.click(
+      screen.getByRole('button', { name: /Apply to 3 selected/ }),
+    );
+    expect(
+      screen.getByText('Nothing left to review in this view'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /needing review/ })).toBeNull();
+  });
+});
